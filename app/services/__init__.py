@@ -1,0 +1,1 @@
+"""Lógica de negocio — matching, CV parsing, embeddings."""

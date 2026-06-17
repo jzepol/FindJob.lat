@@ -1,0 +1,1 @@
+"""Tareas Celery — scraping, embeddings, alertas."""
