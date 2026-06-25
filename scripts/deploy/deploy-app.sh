@@ -24,8 +24,21 @@ cd frontend
 npm ci
 set -a && source .env.production && set +a
 npm run build
+
+echo "==> reiniciar frontend (pm2)"
+mkdir -p logs
+if pm2 describe findjob-web >/dev/null 2>&1; then
+  pm2 reload ecosystem.config.cjs --env production --update-env
+else
+  pm2 start ecosystem.config.cjs --env production
+fi
+pm2 save
 cd ..
 
-echo "==> reiniciar servicios (requiere sudo)"
-sudo systemctl restart findjob-api findjob-web
-sudo systemctl status findjob-api findjob-web --no-pager
+echo "==> reiniciar API (requiere sudo si usás systemd)"
+if systemctl is-enabled findjob-api >/dev/null 2>&1; then
+  sudo systemctl restart findjob-api
+  sudo systemctl status findjob-api --no-pager
+else
+  echo "    findjob-api no está en systemd — levantá la API manualmente o con setup-server.sh"
+fi

@@ -62,14 +62,12 @@ sudo -u "${APP_USER}" "${PYTHON_BIN}" -m venv .venv
 sudo -u "${APP_USER}" .venv/bin/pip install --upgrade pip
 sudo -u "${APP_USER}" .venv/bin/pip install -e .
 
-echo "==> systemd"
+echo "==> systemd (solo API — frontend con PM2)"
 cp "${APP_DIR}/scripts/deploy/findjob-api.service" /etc/systemd/system/
-cp "${APP_DIR}/scripts/deploy/findjob-web.service" /etc/systemd/system/
 sed -i "s|__APP_DIR__|${APP_DIR}|g; s|__APP_USER__|${APP_USER}|g; s|__WEB_PORT__|${WEB_PORT}|g" \
-  /etc/systemd/system/findjob-api.service \
-  /etc/systemd/system/findjob-web.service
+  /etc/systemd/system/findjob-api.service
 systemctl daemon-reload
-systemctl enable findjob-api findjob-web
+systemctl enable findjob-api
 
 echo "==> nginx"
 cp "${APP_DIR}/scripts/deploy/nginx-findjob.conf" /etc/nginx/sites-available/findjob
@@ -94,3 +92,4 @@ echo "  Frontend: puerto ${WEB_PORT} | API: puerto ${API_PORT}"
 echo ""
 echo "Siguiente (como ${APP_USER}):"
 echo "  cd ${APP_DIR} && bash scripts/deploy/deploy-app.sh"
+echo "  pm2 startup   # una vez, para que findjob-web arranque al boot"
