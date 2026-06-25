@@ -116,8 +116,12 @@ class LoginIn(BaseModel):
 
 
 class TokenOut(BaseModel):
-    access_token: str
+    access_token: str | None = None
     token_type: str = "bearer"
+
+
+class OAuthExchangeIn(BaseModel):
+    code: str = Field(min_length=10, max_length=2048)
 
 
 class OAuthAccountOut(BaseModel):

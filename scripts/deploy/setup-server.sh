@@ -82,6 +82,9 @@ if [[ -f "${APP_DIR}/.env" ]]; then
   else
     echo "DATABASE_URL=${DB_URL}" >> "${APP_DIR}/.env"
   fi
+  if ! grep -q '^COOKIE_DOMAIN=' "${APP_DIR}/.env"; then
+    echo "COOKIE_DOMAIN=.findjob.lat" >> "${APP_DIR}/.env"
+  fi
   chown "${APP_USER}:${APP_USER}" "${APP_DIR}/.env"
 fi
 

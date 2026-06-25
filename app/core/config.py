@@ -35,6 +35,10 @@ class Settings(BaseSettings):
 
     frontend_url: str = "http://localhost:3000"
     api_base_url: str = "http://localhost:8000"
+    cookie_domain: str | None = Field(
+        default=None,
+        description="Dominio de cookie de sesión (ej. .findjob.lat en producción)",
+    )
 
     # OAuth Google
     google_client_id: str = ""

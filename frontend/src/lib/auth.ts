@@ -1,6 +1,7 @@
-const TOKEN_KEY = "findjob_token";
+const DEV_TOKEN_KEY = "findjob_token";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 const AUTH_BASE = API_BASE.replace("/api/v1", "");
+const IS_DEV = process.env.NODE_ENV === "development";
 
 export interface UserProfile {
   full_name: string | null;
@@ -45,26 +46,37 @@ export interface CompanyWarning {
   message: string;
 }
 
-export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (IS_DEV) {
+    const token = getDevToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
 }
 
-export function setToken(token: string) {
-  localStorage.setItem(TOKEN_KEY, token);
+function getDevToken(): string | null {
+  if (typeof window === "undefined" || !IS_DEV) return null;
+  return sessionStorage.getItem(DEV_TOKEN_KEY);
+}
+
+function setDevToken(token: string | null) {
+  if (typeof window === "undefined" || !IS_DEV) return;
+  if (token) sessionStorage.setItem(DEV_TOKEN_KEY, token);
+  else sessionStorage.removeItem(DEV_TOKEN_KEY);
 }
 
 export function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
+  setDevToken(null);
 }
 
 export async function authFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getToken();
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...authHeaders(),
       ...init?.headers,
     },
   });
@@ -79,25 +91,26 @@ export async function getMe(): Promise<User> {
   return authFetch<User>("/auth/me");
 }
 
-export async function login(email: string, password: string): Promise<string> {
+export async function login(email: string, password: string): Promise<void> {
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
   if (!res.ok) throw new Error("Credenciales inválidas");
   const data = await res.json();
-  setToken(data.access_token);
-  return data.access_token;
+  if (data.access_token) setDevToken(data.access_token);
 }
 
 export async function register(
   email: string,
   password: string,
   fullName?: string,
-): Promise<string> {
+): Promise<void> {
   const res = await fetch(`${API_BASE}/auth/register`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password, full_name: fullName }),
   });
@@ -106,8 +119,34 @@ export async function register(
     throw new Error(err.detail ?? "Error al registrarse");
   }
   const data = await res.json();
-  setToken(data.access_token);
-  return data.access_token;
+  if (data.access_token) setDevToken(data.access_token);
+}
+
+export async function exchangeOAuthCode(code: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/auth/oauth/exchange`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail ?? "No se pudo completar el inicio de sesión");
+  }
+  const data = await res.json();
+  if (data.access_token) setDevToken(data.access_token);
+}
+
+export async function logout(): Promise<void> {
+  try {
+    await fetch(`${API_BASE}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+      headers: authHeaders(),
+    });
+  } finally {
+    clearToken();
+  }
 }
 
 export function googleLoginUrl(): string {
@@ -148,16 +187,15 @@ export interface CvUploadResult {
 }
 
 export async function uploadCv(file: File): Promise<CvUploadResult> {
-  const token = getToken();
-  if (!token) throw new Error("No autenticado");
-
-  const form = new FormData();
-  form.append("file", file);
-
   const res = await fetch(`${API_BASE}/me/profile/cv`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: form,
+    credentials: "include",
+    headers: authHeaders(),
+    body: (() => {
+      const form = new FormData();
+      form.append("file", file);
+      return form;
+    })(),
   });
 
   if (!res.ok) {
@@ -175,10 +213,7 @@ export async function uploadCv(file: File): Promise<CvUploadResult> {
       message = detail;
     } else if (Array.isArray(detail) && detail.length > 0) {
       const first = detail[0];
-      message =
-        typeof first === "string"
-          ? first
-          : (first?.msg ?? message);
+      message = typeof first === "string" ? first : (first?.msg ?? message);
     }
 
     throw new Error(message);

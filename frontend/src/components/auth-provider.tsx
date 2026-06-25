@@ -10,7 +10,7 @@ import {
 import {
   clearToken,
   getMe,
-  getToken,
+  logout as apiLogout,
   type User,
 } from "@/lib/auth";
 
@@ -33,12 +33,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const token = getToken();
-    if (!token) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
     try {
       const me = await getMe();
       setUser(me);
@@ -55,8 +49,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   const logout = useCallback(() => {
-    clearToken();
-    setUser(null);
+    void apiLogout().finally(() => {
+      clearToken();
+      setUser(null);
+    });
   }, []);
 
   return (

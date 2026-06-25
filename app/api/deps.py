@@ -4,8 +4,10 @@ from collections.abc import AsyncGenerator
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from app.core.cookies import AUTH_COOKIE
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session_factory
@@ -26,13 +28,24 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
             raise
 
 
+def _token_from_request(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None,
+) -> str | None:
+    if credentials is not None:
+        return credentials.credentials
+    return request.cookies.get(AUTH_COOKIE)
+
+
 async def get_current_user_optional(
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
 ) -> User | None:
-    if credentials is None:
+    token = _token_from_request(request, credentials)
+    if token is None:
         return None
-    user_id = decode_access_token(credentials.credentials)
+    user_id = decode_access_token(token)
     if user_id is None:
         return None
     return await get_user_by_id(session, user_id)

@@ -6,8 +6,10 @@ import os
 import secrets
 import uuid
 
-# Dev local: oauthlib exige HTTPS salvo esta variable
-os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
+from app.core.config import settings
+
+if settings.is_development:
+    os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
 
 import httpx
 import structlog
