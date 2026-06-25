@@ -45,7 +45,7 @@ class RemoteOKScraper(BaseScraper):
         for job in raw_jobs:
             if not self._is_job_record(job):
                 continue
-            if params.keywords and not self._matches_search(job, params.keywords):
+            if params.keywords and params.keywords != "*" and not self._matches_search(job, params.keywords):
                 continue
             if params.location and not self._matches_location(job, params.location):
                 continue

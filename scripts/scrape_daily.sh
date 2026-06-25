@@ -21,22 +21,29 @@ LOCATIONS=(buenos+aires bogota "ciudad de mexico" lima santiago)
 
 log "=== scrape daily ==="
 
+python scripts/scrape.py -s remoteok -k "*" --max-results 120 "${FLAGS[@]}" >> "${LOG}" 2>&1 || true
+sleep 3
+
 for kw in "${KEYWORDS[@]}"; do
   log "remoteok:${kw}"
   python scripts/scrape.py -s remoteok -k "${kw}" --max-results 50 "${FLAGS[@]}" >> "${LOG}" 2>&1 || true
   sleep 3
 done
 
-for i in "${!COUNTRIES[@]}"; do
-  country="${COUNTRIES[$i]}"
-  location="${LOCATIONS[$i]}"
-  export COMPUTRABAJO_COUNTRY="${country}"
-  for kw in "${KEYWORDS[@]}"; do
-    log "computrabajo:${country}:${kw}"
-    python scripts/scrape.py -s computrabajo -k "${kw}" -l "${location}" \
-      --max-results "${MAX}" "${FLAGS[@]}" >> "${LOG}" 2>&1 || true
-    sleep 5
+if python3 -c "from playwright.sync_api import sync_playwright; p=sync_playwright().start(); b=p.chromium.launch(headless=True); b.close(); p.stop()" 2>/dev/null; then
+  for i in "${!COUNTRIES[@]}"; do
+    country="${COUNTRIES[$i]}"
+    location="${LOCATIONS[$i]}"
+    export COMPUTRABAJO_COUNTRY="${country}"
+    for kw in "${KEYWORDS[@]}"; do
+      log "computrabajo:${country}:${kw}"
+      python scripts/scrape.py -s computrabajo -k "${kw}" -l "${location}" \
+        --max-results "${MAX}" "${FLAGS[@]}" >> "${LOG}" 2>&1 || true
+      sleep 5
+    done
   done
-done
+else
+  log "SKIP computrabajo — Playwright deps faltantes"
+fi
 
 log "=== fin daily ==="

@@ -55,6 +55,12 @@ sudo -u postgres psql -d "${DB_NAME}" -c "CREATE EXTENSION IF NOT EXISTS vector;
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};"
 sudo -u postgres psql -d "${DB_NAME}" -c "GRANT ALL ON SCHEMA public TO ${DB_USER};"
 
+echo "==> Playwright (scrapers Computrabajo/Bumeran)"
+if [[ -f "${APP_DIR}/.venv/bin/playwright" ]]; then
+  sudo -u "${APP_USER}" "${APP_DIR}/.venv/bin/playwright" install chromium || true
+  playwright install-deps chromium || true
+fi
+
 echo "==> Python venv + dependencias (${PYTHON_BIN})"
 cd "${APP_DIR}"
 rm -rf .venv

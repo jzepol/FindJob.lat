@@ -48,8 +48,33 @@ run_scrape() {
   sleep "${SCRAPE_PAUSE_SEC}"
 }
 
+preflight_playwright() {
+  python3 - <<'PY' >/dev/null 2>&1
+from playwright.sync_api import sync_playwright
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True)
+    browser.close()
+PY
+}
+
 log "=== Findjob LATAM scrape — target ≥1000 ==="
 log "Ofertas iniciales: $(count_offers)"
+
+if preflight_playwright; then
+  log "Playwright OK — Computrabajo/Bumeran habilitados"
+  PLAYWRIGHT_OK=1
+else
+  log "WARN Playwright no listo — solo RemoteOK (corré: sudo bash scripts/deploy/install-playwright.sh)"
+  PLAYWRIGHT_OK=0
+fi
+
+# Catálogo completo RemoteOK (~100 ofertas únicas en la API)
+run_scrape "remoteok:all" \
+  python scripts/scrape.py \
+    --source remoteok \
+    --keywords "*" \
+    --max-results 150 \
+    "${COMMON_FLAGS[@]}"
 
 KEYWORDS=(
   "desarrollador"
@@ -83,29 +108,33 @@ declare -A CT_LOCATIONS=(
   [cl]="santiago"
 )
 
-for country in ar co mx pe cl; do
-  location="${CT_LOCATIONS[$country]}"
-  export COMPUTRABAJO_COUNTRY="${country}"
+if [[ "${PLAYWRIGHT_OK}" -eq 1 ]]; then
+  for country in ar co mx pe cl; do
+    location="${CT_LOCATIONS[$country]}"
+    export COMPUTRABAJO_COUNTRY="${country}"
+    for kw in "${KEYWORDS[@]}"; do
+      run_scrape "computrabajo:${country}:${kw}" \
+        python scripts/scrape.py \
+          --source computrabajo \
+          --keywords "${kw}" \
+          --location "${location}" \
+          --max-results "${MAX_PER_RUN}" \
+          "${COMMON_FLAGS[@]}"
+    done
+  done
+
+  # ── Bumeran (Argentina) ──────────────────────────────────
   for kw in "${KEYWORDS[@]}"; do
-    run_scrape "computrabajo:${country}:${kw}" \
+    run_scrape "bumeran:${kw}" \
       python scripts/scrape.py \
-        --source computrabajo \
+        --source bumeran \
         --keywords "${kw}" \
-        --location "${location}" \
+        --location "buenos aires" \
         --max-results "${MAX_PER_RUN}" \
         "${COMMON_FLAGS[@]}"
   done
-done
-
-# ── Bumeran (Argentina) ────────────────────────────────────
-for kw in "${KEYWORDS[@]}"; do
-  run_scrape "bumeran:${kw}" \
-    python scripts/scrape.py \
-      --source bumeran \
-      --keywords "${kw}" \
-      --location "buenos aires" \
-      --max-results "${MAX_PER_RUN}" \
-      "${COMMON_FLAGS[@]}"
-done
+else
+  log "SKIP computrabajo/bumeran — instalar deps Playwright primero"
+fi
 
 log "=== FIN — total ofertas: $(count_offers) ==="
