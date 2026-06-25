@@ -27,11 +27,13 @@ npm run build
 
 echo "==> reiniciar frontend (pm2)"
 mkdir -p logs
+# Liberar puerto si quedó un next manual colgado de un deploy anterior
+fuser -k "${WEB_PORT:-3001}"/tcp 2>/dev/null || true
+sleep 1
 if pm2 describe findjob-web >/dev/null 2>&1; then
-  pm2 reload ecosystem.config.cjs --env production --update-env
-else
-  pm2 start ecosystem.config.cjs --env production
+  pm2 delete findjob-web 2>/dev/null || true
 fi
+pm2 start ecosystem.config.cjs --env production
 pm2 save
 cd ..
 
