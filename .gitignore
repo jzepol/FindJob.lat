@@ -17,10 +17,15 @@ htmlcov/
 
 # IDE / OS
 .DS_Store
+*:Zone.Identifier
 .idea/
 .vscode/
 
-# Node (si se agrega frontend)
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/dist/
+frontend/.env.local
 node_modules/
 .next/
 dist/

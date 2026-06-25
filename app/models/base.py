@@ -82,6 +82,41 @@ class ScrapeRunStatus(str, enum.Enum):
     FAILED = "failed"
 
 
+class OAuthProvider(str, enum.Enum):
+    """Proveedor OAuth vinculado."""
+
+    GOOGLE = "google"
+    LINKEDIN = "linkedin"
+
+
+class CompanyReportType(str, enum.Enum):
+    """Tipo de reporte sobre una empresa/oferta."""
+
+    GHOST_JOB = "ghost_job"
+    HIGH_TURNOVER = "high_turnover"
+    MISLEADING_SALARY = "misleading_salary"
+    ATS_BLACK_HOLE = "ats_black_hole"
+    OTHER = "other"
+
+
+class CompanyReportStatus(str, enum.Enum):
+    """Estado de moderación del reporte."""
+
+    PENDING = "pending"
+    VERIFIED = "verified"
+    REJECTED = "rejected"
+
+
+class KarmaEventType(str, enum.Enum):
+    """Eventos que otorgan karma (una vez por usuario)."""
+
+    OAUTH_LINKED = "oauth_linked"
+    PROFILE_COMPLETE = "profile_complete"
+    CV_UPLOADED = "cv_uploaded"
+    FIRST_SEARCH = "first_search"
+    EMAIL_VERIFIED = "email_verified"
+
+
 # ── Helpers para SAEnum ──────────────────────────────────────────────────────
 
 def sa_enum_type(enum_cls: type[enum.Enum], *, create_constraint: bool = True) -> SAEnum:

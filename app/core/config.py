@@ -21,6 +21,8 @@ class Settings(BaseSettings):
 
     # ── App ──────────────────────────────────────────
     app_name: str = "Findjob"
+    api_host: str = "0.0.0.0"
+    api_port: int = 8000
     app_env: Literal["development", "staging", "production"] = "development"
     debug: bool = False
     secret_key: str = Field(
@@ -28,6 +30,21 @@ class Settings(BaseSettings):
         min_length=32,
         description="Clave secreta para JWT y sesiones",
     )
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 60 * 24 * 7  # 7 días
+
+    frontend_url: str = "http://localhost:3000"
+    api_base_url: str = "http://localhost:8000"
+
+    # OAuth Google
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "http://localhost:8000/api/v1/auth/google/callback"
+
+    # Karma / reportes
+    karma_min_to_report: int = 50
+    company_warning_threshold: int = 3
+    company_crowd_verify_threshold: int = 3
 
     # ── Database ─────────────────────────────────────
     database_url: str = Field(

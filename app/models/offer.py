@@ -33,6 +33,7 @@ from app.models.base import (
 
 if TYPE_CHECKING:
     from app.models.application import Application
+    from app.models.company_report import CompanyReport
     from app.models.salary_report import SalaryReport
     from app.models.saved_offer import SavedOffer
     from app.models.source import Source
@@ -106,6 +107,7 @@ class Offer(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     saved_by: Mapped[list[SavedOffer]] = relationship(back_populates="offer")
     applications: Mapped[list[Application]] = relationship(back_populates="offer")
     salary_reports: Mapped[list[SalaryReport]] = relationship(back_populates="offer")
+    company_reports: Mapped[list[CompanyReport]] = relationship(back_populates="offer")
 
     def __repr__(self) -> str:
         return f"<Offer {self.title!r} @ {self.company!r}>"
