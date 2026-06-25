@@ -67,10 +67,14 @@ def can_report(user: User) -> bool:
 
 def karma_progress(user: User) -> dict:
     missing = settings.karma_min_to_report - user.karma_score
+    earned = {
+        event.event_type.value: event.points
+        for event in (user.karma_events or [])
+    }
     return {
         "score": user.karma_score,
         "min_to_report": settings.karma_min_to_report,
         "can_report": can_report(user),
         "points_needed": max(0, missing),
-        "events": {k.value: v for k, v in KARMA_POINTS.items()},
+        "events": earned,
     }

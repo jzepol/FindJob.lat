@@ -133,6 +133,60 @@ export async function updateProfile(data: Partial<UserProfile>): Promise<UserPro
   });
 }
 
+export interface CvUploadResult {
+  cv_text: string;
+  chars: number;
+  filename: string;
+  karma_gained: number;
+  karma_score: number;
+  parsed_by: string;
+  embedding_ready: boolean;
+  summary: string | null;
+  skills_extracted: string[];
+  headline_extracted: string | null;
+  full_name_extracted: string | null;
+}
+
+export async function uploadCv(file: File): Promise<CvUploadResult> {
+  const token = getToken();
+  if (!token) throw new Error("No autenticado");
+
+  const form = new FormData();
+  form.append("file", file);
+
+  const res = await fetch(`${API_BASE}/me/profile/cv`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+
+  if (!res.ok) {
+    if (res.status === 404) {
+      throw new Error(
+        "El servicio de CV no está disponible en el servidor. Reiniciá la API y probá de nuevo.",
+      );
+    }
+
+    const err = await res.json().catch(() => ({}));
+    const detail = err.detail;
+    let message = "Error al subir el CV";
+
+    if (typeof detail === "string") {
+      message = detail;
+    } else if (Array.isArray(detail) && detail.length > 0) {
+      const first = detail[0];
+      message =
+        typeof first === "string"
+          ? first
+          : (first?.msg ?? message);
+    }
+
+    throw new Error(message);
+  }
+
+  return res.json();
+}
+
 export async function submitCompanyReport(data: {
   offer_id?: string;
   company_name: string;

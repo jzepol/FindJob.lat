@@ -1,0 +1,18 @@
+[Unit]
+Description=Findjob.lat Frontend (Next.js)
+After=network.target findjob-api.service
+Wants=findjob-api.service
+
+[Service]
+Type=simple
+User=__APP_USER__
+Group=__APP_USER__
+WorkingDirectory=__APP_DIR__/frontend
+EnvironmentFile=__APP_DIR__/frontend/.env.production
+Environment=PORT=__WEB_PORT__
+ExecStart=/usr/bin/npm start
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

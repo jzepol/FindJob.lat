@@ -168,6 +168,20 @@ class KarmaOut(BaseModel):
     events: dict[str, int]
 
 
+class CvUploadOut(BaseModel):
+    cv_text: str
+    chars: int
+    filename: str
+    karma_gained: int
+    karma_score: int
+    parsed_by: str = "gemini"
+    embedding_ready: bool = False
+    summary: str | None = None
+    skills_extracted: list[str] = Field(default_factory=list)
+    headline_extracted: str | None = None
+    full_name_extracted: str | None = None
+
+
 # ── Company reports ──────────────────────────────────────────
 
 

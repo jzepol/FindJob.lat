@@ -152,7 +152,7 @@ body {
   }
 
   .input-field {
-    @apply w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-foreground outline-none ring-primary/40 placeholder:text-muted focus:ring-2;
+    @apply w-full rounded-xl border border-border-strong bg-surface px-4 py-3 text-sm text-foreground shadow-sm outline-none transition placeholder:text-muted focus:border-primary/40 focus:ring-2 focus:ring-primary/25;
   }
 
   .trust-pill {
@@ -179,4 +179,86 @@ body {
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
+}
+
+/* ── Celebration toast (estilo Pedidos Ya) ─────────── */
+@keyframes celebration-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes celebration-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes celebration-check {
+  0% {
+    transform: scale(0) rotate(-45deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15) rotate(0deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes celebration-enter {
+  0% {
+    transform: translateY(16px) scale(0.94);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes info-toast-enter {
+  0% {
+    transform: translateY(-12px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.celebration-pop {
+  animation: celebration-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.celebration-ring {
+  animation: celebration-ring 0.5s ease-out forwards;
+}
+
+.celebration-check {
+  animation: celebration-check 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s both;
+}
+
+.celebration-enter {
+  animation: celebration-enter 0.35s ease-out forwards;
+}
+
+.info-toast-enter {
+  animation: info-toast-enter 0.35s ease-out forwards;
 }

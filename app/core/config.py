@@ -66,6 +66,7 @@ class Settings(BaseSettings):
     embedding_batch_size: int = 20
     embedding_max_desc_chars: int = 8000
     embedding_task_type: str = "RETRIEVAL_DOCUMENT"
+    embedding_query_task_type: str = "RETRIEVAL_QUERY"
     embedding_request_delay: float = 0.5
 
     # ── Gemini ───────────────────────────────────────

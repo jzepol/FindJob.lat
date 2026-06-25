@@ -81,13 +81,18 @@ def _embedding_model_name() -> str:
     return model.removeprefix("models/")
 
 
-def _embed_batch_sync(client: genai.Client, texts: list[str]) -> list[list[float]]:
+def _embed_batch_sync(
+    client: genai.Client,
+    texts: list[str],
+    *,
+    task_type: str | None = None,
+) -> list[list[float]]:
     """Llama a embed_content de Gemini (bloqueante)."""
     result = client.models.embed_content(
         model=_embedding_model_name(),
         contents=texts,
         config=types.EmbedContentConfig(
-            task_type=settings.embedding_task_type,
+            task_type=task_type or settings.embedding_task_type,
             output_dimensionality=settings.embedding_dimensions,
         ),
     )
@@ -102,7 +107,11 @@ def _embed_batch_sync(client: genai.Client, texts: list[str]) -> list[list[float
     return vectors
 
 
-async def encode_texts(texts: list[str]) -> list[list[float]]:
+async def encode_texts(
+    texts: list[str],
+    *,
+    task_type: str | None = None,
+) -> list[list[float]]:
     """Codifica textos en lotes vía API de Gemini."""
     if not texts:
         return []
@@ -113,7 +122,9 @@ async def encode_texts(texts: list[str]) -> list[list[float]]:
 
     for start in range(0, len(texts), batch_size):
         batch = texts[start : start + batch_size]
-        vectors = await asyncio.to_thread(_embed_batch_sync, client, batch)
+        vectors = await asyncio.to_thread(
+            _embed_batch_sync, client, batch, task_type=task_type
+        )
         all_vectors.extend(vectors)
         if start + batch_size < len(texts) and settings.embedding_request_delay > 0:
             await asyncio.sleep(settings.embedding_request_delay)
@@ -183,3 +194,43 @@ async def embed_pending_offers(
     result = await session.execute(query)
     offers = list(result.scalars().all())
     return await embed_offer_list(session, offers)
+
+
+def build_cv_embedding_text(
+    *,
+    cv_text: str,
+    headline: str | None = None,
+    skills: list[str] | None = None,
+) -> str:
+    """Texto optimizado para embedear el perfil del candidato (query side)."""
+    parts: list[str] = []
+    if headline and headline.strip():
+        parts.append(headline.strip())
+    if skills:
+        parts.extend(s.strip() for s in skills if s and s.strip())
+    body = cv_text.strip()
+    limit = settings.embedding_max_desc_chars
+    if len(body) > limit:
+        body = body[:limit]
+    parts.append(body)
+    return "\n".join(parts)
+
+
+async def embed_cv_text(
+    cv_text: str,
+    *,
+    headline: str | None = None,
+    skills: list[str] | None = None,
+) -> list[float]:
+    """Embedding del CV con RETRIEVAL_QUERY para matching con ofertas."""
+    text = build_cv_embedding_text(cv_text=cv_text, headline=headline, skills=skills)
+    if not text.strip():
+        raise EmbeddingError("CV vacío para embedding")
+
+    vectors = await encode_texts([text], task_type=settings.embedding_query_task_type)
+    vector = vectors[0]
+    if len(vector) != settings.embedding_dimensions:
+        raise EmbeddingError(
+            f"Dimensión inesperada: {len(vector)} (esperado {settings.embedding_dimensions})"
+        )
+    return vector

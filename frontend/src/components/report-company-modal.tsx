@@ -57,7 +57,10 @@ export function ReportCompanyButton({
         report_type: type,
         description: description || undefined,
       });
-      toast("Reporte enviado — gracias por ayudar a la comunidad");
+      toast("Tu reporte fue registrado. Gracias por ayudar a la comunidad.", {
+        variant: "success",
+        title: "¡Reporte enviado!",
+      });
       setOpen(false);
       await refresh();
     } catch (e) {

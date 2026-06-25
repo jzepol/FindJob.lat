@@ -33,7 +33,11 @@ async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
     result = await session.execute(
         select(User)
         .where(User.email == email.lower())
-        .options(selectinload(User.profile), selectinload(User.oauth_accounts))
+        .options(
+            selectinload(User.profile),
+            selectinload(User.oauth_accounts),
+            selectinload(User.karma_events),
+        )
     )
     return result.scalar_one_or_none()
 
@@ -42,7 +46,11 @@ async def get_user_by_id(session: AsyncSession, user_id: uuid.UUID) -> User | No
     result = await session.execute(
         select(User)
         .where(User.id == user_id)
-        .options(selectinload(User.profile), selectinload(User.oauth_accounts))
+        .options(
+            selectinload(User.profile),
+            selectinload(User.oauth_accounts),
+            selectinload(User.karma_events),
+        )
     )
     return result.scalar_one_or_none()
 
