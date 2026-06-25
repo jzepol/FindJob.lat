@@ -67,11 +67,13 @@ class Settings(BaseSettings):
     # ── Embeddings (Gemini API) ──────────────────────
     embedding_dimensions: int = 768
     embed_after_scrape: bool = True
-    embedding_batch_size: int = 20
+    embedding_batch_size: int = 10
     embedding_max_desc_chars: int = 8000
     embedding_task_type: str = "RETRIEVAL_DOCUMENT"
     embedding_query_task_type: str = "RETRIEVAL_QUERY"
-    embedding_request_delay: float = 0.5
+    embedding_request_delay: float = 1.0
+    embedding_quota_retry_seconds: float = 65.0
+    embedding_tick_limit: int = 10
 
     # ── Gemini ───────────────────────────────────────
     gemini_api_key: str = ""

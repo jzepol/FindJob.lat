@@ -15,9 +15,10 @@ import sys
 
 import structlog
 
+from app.core.config import settings
 from app.core.database import async_session_factory
 from app.scrapers.registry import list_scrapers
-from app.services.embeddings import embed_pending_offers
+from app.services.embeddings import EmbeddingQuotaError, embed_pending_offers
 
 structlog.configure(
     processors=[
@@ -53,18 +54,28 @@ def main() -> None:
     sources = ", ".join(list_scrapers())
     parser = argparse.ArgumentParser(description="Generar embeddings para ofertas pendientes")
     parser.add_argument("--source", "-s", default=None, choices=list_scrapers(), help=sources)
-    parser.add_argument("--limit", type=int, default=None, help="Máximo de ofertas a procesar")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help=f"Máximo de ofertas a procesar (default cron: {settings.embedding_tick_limit})",
+    )
     parser.add_argument(
         "--force",
         action="store_true",
         help="Re-generar embeddings aunque ya existan",
     )
     args = parser.parse_args()
+    limit = args.limit if args.limit is not None else settings.embedding_tick_limit
 
     try:
         code = asyncio.run(
-            run(source=args.source, limit=args.limit, force=args.force),
+            run(source=args.source, limit=limit, force=args.force),
         )
+    except EmbeddingQuotaError as exc:
+        logger.warning("embed_quota_exhausted", error=str(exc))
+        print(f"\n⚠ Cuota Gemini agotada. Reintentá en ~1 min (cron lo hará solo).\n")
+        code = 0
     except Exception as exc:
         logger.exception("embed_failed", error=str(exc))
         print(f"\n✗ Error: {exc}\n", file=sys.stderr)

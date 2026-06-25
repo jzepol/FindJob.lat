@@ -7,6 +7,7 @@ import uuid
 
 import structlog
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +23,10 @@ _client_lock = asyncio.Lock()
 
 class EmbeddingError(Exception):
     """Error al generar embeddings con Gemini."""
+
+
+class EmbeddingQuotaError(EmbeddingError):
+    """Cuota de Gemini agotada (429)."""
 
 
 async def _get_gemini_client() -> genai.Client:
@@ -107,6 +112,49 @@ def _embed_batch_sync(
     return vectors
 
 
+def _is_quota_error(exc: BaseException) -> bool:
+    msg = str(exc)
+    if isinstance(exc, genai_errors.ClientError) and getattr(exc, "code", None) == 429:
+        return True
+    return "429" in msg or "RESOURCE_EXHAUSTED" in msg
+
+
+async def _embed_batch_with_retry(
+    client: genai.Client,
+    batch: list[str],
+    *,
+    task_type: str | None,
+) -> list[list[float]]:
+    """Embedea un lote con reintentos y subdivisión ante cuota agotada."""
+    attempt = 0
+    while True:
+        try:
+            return await asyncio.to_thread(
+                _embed_batch_sync, client, batch, task_type=task_type
+            )
+        except Exception as exc:
+            if not _is_quota_error(exc):
+                raise EmbeddingError(str(exc)) from exc
+            if len(batch) > 1:
+                mid = len(batch) // 2
+                logger.warning("embed_quota_split", size=len(batch), left=mid, right=len(batch) - mid)
+                left = await _embed_batch_with_retry(
+                    client, batch[:mid], task_type=task_type
+                )
+                if settings.embedding_request_delay > 0:
+                    await asyncio.sleep(settings.embedding_request_delay)
+                right = await _embed_batch_with_retry(
+                    client, batch[mid:], task_type=task_type
+                )
+                return left + right
+            attempt += 1
+            if attempt > 4:
+                raise EmbeddingQuotaError(str(exc)) from exc
+            wait = settings.embedding_quota_retry_seconds * attempt
+            logger.warning("embed_quota_retry", attempt=attempt, wait_seconds=wait)
+            await asyncio.sleep(wait)
+
+
 async def encode_texts(
     texts: list[str],
     *,
@@ -122,9 +170,7 @@ async def encode_texts(
 
     for start in range(0, len(texts), batch_size):
         batch = texts[start : start + batch_size]
-        vectors = await asyncio.to_thread(
-            _embed_batch_sync, client, batch, task_type=task_type
-        )
+        vectors = await _embed_batch_with_retry(client, batch, task_type=task_type)
         all_vectors.extend(vectors)
         if start + batch_size < len(texts) and settings.embedding_request_delay > 0:
             await asyncio.sleep(settings.embedding_request_delay)
