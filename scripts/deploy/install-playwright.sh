@@ -12,12 +12,14 @@ source .venv/bin/activate
 echo "==> playwright browsers"
 playwright install chromium
 
-if command -v sudo >/dev/null && sudo -n true 2>/dev/null; then
+PW="${APP_DIR}/.venv/bin/playwright"
+if command -v sudo >/dev/null; then
   echo "==> dependencias del sistema (sudo)"
-  sudo playwright install-deps chromium
+  echo "    sudo ${PW} install-deps chromium"
+  sudo "${PW}" install-deps chromium
 else
   echo "==> Sin sudo: corré manualmente:"
-  echo "    sudo \$(which playwright) install-deps chromium"
+  echo "    sudo ${PW} install-deps chromium"
 fi
 
 echo "==> test rápido computrabajo AR"
