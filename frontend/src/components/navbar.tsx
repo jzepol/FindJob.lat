@@ -11,9 +11,10 @@ import { Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
 
 const LINKS = [
-  { href: "/jobs", label: "Ofertas" },
-  { href: "/salarios", label: "Salarios" },
-  { href: "/perfil", label: "Mi perfil" },
+  { href: "/jobs", label: "Ofertas", match: (p: string) => p === "/jobs" || (p.startsWith("/jobs/") && !p.startsWith("/jobs/for-me")) },
+  { href: "/jobs/for-me", label: "Para vos", match: (p: string) => p.startsWith("/jobs/for-me") },
+  { href: "/salarios", label: "Salarios", match: (p: string) => p.startsWith("/salarios") },
+  { href: "/perfil", label: "Mi perfil", match: (p: string) => p.startsWith("/perfil") },
 ];
 
 export function Navbar() {
@@ -51,7 +52,7 @@ export function Navbar() {
               href={link.href}
               className={cn(
                 "text-sm font-medium transition hover:text-primary",
-                pathname === link.href ? "text-primary" : "text-muted",
+                link.match(pathname) ? "text-primary" : "text-muted",
               )}
             >
               {link.label}

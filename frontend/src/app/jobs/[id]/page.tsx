@@ -15,6 +15,7 @@ import { ModalityBadge } from "@/components/modality-badge";
 import { SeniorityBadge } from "@/components/seniority-badge";
 import { CompanyAvatar } from "@/components/company-avatar";
 import { CompanyWarningBanner } from "@/components/company-warning";
+import { OfferMatchBadge } from "@/components/offer-match-badge";
 import { ReportCompanyButton } from "@/components/report-company-modal";
 import { getOffer, getSimilarOffers } from "@/lib/api";
 import { formatSalary, timeAgo } from "@/lib/utils";
@@ -77,7 +78,8 @@ export default async function JobDetailPage({
                     )}
                     <span>{timeAgo(offer.published_at)}</span>
                   </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <OfferMatchBadge offerId={offer.id} />
                     <ModalityBadge modality={offer.modality} />
                     <SeniorityBadge seniority={offer.seniority} />
                   </div>
@@ -86,6 +88,7 @@ export default async function JobDetailPage({
             </div>
 
             <aside className="glass h-fit rounded-2xl p-5 lg:sticky lg:top-24">
+              <OfferMatchBadge offerId={offer.id} variant="sidebar" />
               {salary && (
                 <p className="font-mono text-2xl font-bold text-accent">{salary}</p>
               )}
