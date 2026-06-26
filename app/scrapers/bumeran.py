@@ -77,19 +77,20 @@ class BumeranScraper(BaseScraper):
         page.on("request", on_request)
         page.on("response", on_response)
 
-        await page.goto(
-            listing_url,
-            wait_until="domcontentloaded",
-            timeout=settings.scraper_page_timeout_ms,
-        )
+        def _is_search_v2(response) -> bool:
+            return "searchV2" in response.url and response.request.method == "POST"
+
         try:
-            await page.wait_for_response(
-                lambda r: "searchV2" in r.url and r.request.method == "POST",
-                timeout=25_000,
-            )
+            async with page.expect_response(_is_search_v2, timeout=25_000):
+                await page.goto(
+                    listing_url,
+                    wait_until="domcontentloaded",
+                    timeout=settings.scraper_page_timeout_ms,
+                )
         except Exception:
-            logger.warning("bumeran_searchv2_wait_timeout", url=listing_url)
-            await page.wait_for_timeout(10_000)
+            if 0 not in session["pages"] and not session.get("jwt"):
+                logger.warning("bumeran_searchv2_wait_timeout", url=listing_url)
+                await page.wait_for_timeout(8_000)
 
         offers: list[RawOffer] = []
         page_num = 0
@@ -121,11 +122,19 @@ class BumeranScraper(BaseScraper):
             page_num += 1
             await polite_delay(0.4)
 
-        logger.info(
+        total_available = None
+        first_payload = session["pages"].get(0)
+        if isinstance(first_payload, dict):
+            total_available = first_payload.get("total")
+
+        log_fn = logger.info if offers else logger.warning
+        log_fn(
             "bumeran_api_fetched",
             url=listing_url,
             requested=max_results,
             count=len(offers[:max_results]),
+            total_available=total_available,
+            has_jwt=bool(session.get("jwt")),
         )
         return offers[:max_results]
 
