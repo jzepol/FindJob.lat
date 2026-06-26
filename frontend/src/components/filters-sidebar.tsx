@@ -9,7 +9,9 @@ export interface FilterState {
   location: string;
   modality: Modality[];
   seniority: Seniority[];
+  /** @deprecated use sources */
   source: string;
+  sources: string[];
   salary_min: number;
   published_within: "" | "today" | "week" | "month";
   sort: "relevance" | "published_at" | "salary";
@@ -44,6 +46,13 @@ export function FiltersSidebar({
       ? filters.seniority.filter((x) => x !== s)
       : [...filters.seniority, s];
     update("seniority", next);
+  }
+
+  function toggleSource(slug: string) {
+    const next = filters.sources.includes(slug)
+      ? filters.sources.filter((x) => x !== slug)
+      : [...filters.sources, slug];
+    onChange({ ...filters, sources: next, source: "" });
   }
 
   return (
@@ -132,19 +141,34 @@ export function FiltersSidebar({
         </div>
 
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-muted">Fuente</label>
-          <select
-            value={filters.source}
-            onChange={(e) => update("source", e.target.value)}
-            className="w-full rounded-xl bg-surface-2 px-3 py-2 text-sm outline-none"
-          >
-            <option value="">Todas</option>
+          <label className="mb-2 block text-xs font-medium text-muted">
+            Portales {filters.sources.length > 0 && `(${filters.sources.length})`}
+          </label>
+          <div className="flex flex-col gap-1.5">
             {sources.map((s) => (
-              <option key={s.slug} value={s.slug}>
-                {s.name}
-              </option>
+              <label
+                key={s.slug}
+                className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition hover:bg-surface-2"
+              >
+                <input
+                  type="checkbox"
+                  checked={filters.sources.includes(s.slug)}
+                  onChange={() => toggleSource(s.slug)}
+                  className="accent-primary"
+                />
+                <span className="text-foreground-secondary">{s.name}</span>
+              </label>
             ))}
-          </select>
+          </div>
+          {filters.sources.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onChange({ ...filters, sources: [], source: "" })}
+              className="mt-2 text-xs text-primary hover:underline"
+            >
+              Limpiar portales
+            </button>
+          )}
         </div>
 
         <div>

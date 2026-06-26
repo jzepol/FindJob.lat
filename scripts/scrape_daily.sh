@@ -34,10 +34,9 @@ if python3 -c "from playwright.sync_api import sync_playwright; p=sync_playwrigh
   for i in "${!COUNTRIES[@]}"; do
     country="${COUNTRIES[$i]}"
     location="${LOCATIONS[$i]}"
-    export COMPUTRABAJO_COUNTRY="${country}"
     for kw in "${KEYWORDS[@]}"; do
       log "computrabajo:${country}:${kw}"
-      python scripts/scrape.py -s computrabajo -k "${kw}" -l "${location}" \
+      python scripts/scrape.py -s "computrabajo-${country}" -k "${kw}" -l "${location}" \
         --max-results "${MAX}" "${FLAGS[@]}" >> "${LOG}" 2>&1 || true
       sleep 5
     done

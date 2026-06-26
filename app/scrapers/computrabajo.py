@@ -144,13 +144,18 @@ _EXTRACT_DETAIL_SCRIPT = """
 
 
 class ComputrabajoScraper(BaseScraper):
-    """Busca ofertas en computrabajo.com (país configurable vía settings)."""
+    """Busca ofertas en computrabajo.com (un país por instancia / slug)."""
 
-    slug = "computrabajo"
+    def __init__(self, country: str | None = None) -> None:
+        self._country = (country or settings.computrabajo_country).lower()
+
+    @property
+    def slug(self) -> str:
+        return f"computrabajo-{self._country}"
 
     @property
     def base_url(self) -> str:
-        return settings.computrabajo_base_url
+        return f"https://{self._country}.computrabajo.com"
 
     async def search(
         self,

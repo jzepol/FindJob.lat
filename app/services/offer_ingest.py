@@ -28,37 +28,7 @@ from app.services.normalizer import (
 
 logger = structlog.get_logger(__name__)
 
-def _computrabajo_source_defaults() -> dict[str, Any]:
-    from app.core.config import settings
-
-    country_names = {
-        "ar": "Argentina",
-        "co": "Colombia",
-        "mx": "México",
-        "pe": "Perú",
-        "cl": "Chile",
-    }
-    country = settings.computrabajo_country
-    label = country_names.get(country, country.upper())
-    return {
-        "name": f"Computrabajo {label}",
-        "base_url": settings.computrabajo_base_url,
-    }
-
-
-from collections.abc import Callable
-
-SOURCE_DEFAULTS: dict[str, dict[str, Any] | Callable[[], dict[str, Any]]] = {
-    "computrabajo": _computrabajo_source_defaults,
-    "remoteok": lambda: {
-        "name": "Remote OK",
-        "base_url": "https://remoteok.com",
-    },
-    "bumeran": lambda: {
-        "name": "Bumeran Argentina",
-        "base_url": "https://www.bumeran.com.ar",
-    },
-}
+from app.services.source_defaults import defaults_for_slug
 
 
 async def ensure_source(session: AsyncSession, slug: str) -> Source:
@@ -66,11 +36,10 @@ async def ensure_source(session: AsyncSession, slug: str) -> Source:
     result = await session.execute(select(Source).where(Source.slug == slug))
     source = result.scalar_one_or_none()
 
-    defaults_fn = SOURCE_DEFAULTS.get(slug)
-    if defaults_fn is None:
-        raise ValueError(f"No hay defaults configurados para la fuente {slug!r}")
-
-    defaults = defaults_fn() if callable(defaults_fn) else defaults_fn
+    try:
+        defaults = defaults_for_slug(slug)
+    except ValueError as exc:
+        raise ValueError(f"No hay defaults configurados para la fuente {slug!r}") from exc
 
     if source is not None:
         # Sincronizar país/base_url si cambió la configuración

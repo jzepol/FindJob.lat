@@ -20,6 +20,11 @@ function parseFilters(params: URLSearchParams): FilterState {
     modality: modality.length ? modality : params.get("modality") ? [params.get("modality") as Modality] : [],
     seniority: seniority.length ? seniority : params.get("seniority") ? [params.get("seniority") as Seniority] : [],
     source: params.get("source") ?? "",
+    sources: params.getAll("sources").length
+      ? params.getAll("sources")
+      : params.get("source")
+        ? [params.get("source")!]
+        : [],
     salary_min: Number(params.get("salary_min") ?? 0),
     published_within: (params.get("published_within") as FilterState["published_within"]) ?? "",
     sort: (params.get("sort") as FilterState["sort"]) ?? "published_at",
@@ -30,7 +35,7 @@ function buildQuery(filters: FilterState, page: number): string {
   const p = new URLSearchParams();
   if (filters.q) p.set("q", filters.q);
   if (filters.location) p.set("location", filters.location);
-  if (filters.source) p.set("source", filters.source);
+  filters.sources.forEach((s) => p.append("sources", s));
   if (filters.salary_min > 0) p.set("salary_min", String(filters.salary_min));
   if (filters.published_within) p.set("published_within", filters.published_within);
   p.set("sort", filters.sort);

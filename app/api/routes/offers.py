@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import get_session
 from app.api.schemas import CompanyWarningOut, OfferDetail, OfferSummary, PaginatedOffers, SourceOut
 from app.services.company_reports import get_company_warning
+from app.services.location_filter import location_like_patterns
 from app.models.base import Modality, OfferStatus, Seniority
 from app.models.offer import Offer
 from app.models.source import Source
@@ -58,6 +59,7 @@ async def list_offers(
     modality: list[Modality] | None = Query(None),
     seniority: list[Seniority] | None = Query(None),
     source: str | None = None,
+    sources: list[str] | None = Query(None, description="Filtrar por uno o más portales"),
     salary_min: float | None = None,
     published_within: str | None = Query(None, pattern="^(today|week|month)$"),
     sort: str = Query("published_at", pattern="^(relevance|published_at|salary)$"),
@@ -84,7 +86,11 @@ async def list_offers(
         )
 
     if location:
-        query = query.where(func.lower(Offer.location).like(f"%{location.lower()}%"))
+        patterns = location_like_patterns(location)
+        if patterns:
+            query = query.where(
+                or_(*[func.lower(Offer.location).like(p) for p in patterns])
+            )
 
     if modality:
         query = query.where(Offer.modality.in_(modality))
@@ -92,8 +98,9 @@ async def list_offers(
     if seniority:
         query = query.where(Offer.seniority.in_(seniority))
 
-    if source:
-        query = query.where(Source.slug == source)
+    slug_filter = sources or ([source] if source else None)
+    if slug_filter:
+        query = query.where(Source.slug.in_(slug_filter))
 
     if salary_min is not None:
         query = query.where(Offer.salary_min >= salary_min)
