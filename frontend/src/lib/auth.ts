@@ -1,3 +1,5 @@
+import type { MatchStats } from "@/lib/types";
+
 const DEV_TOKEN_KEY = "findjob_token";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 const AUTH_BASE = API_BASE.replace("/api/v1", "");
@@ -155,6 +157,18 @@ export function googleLoginUrl(): string {
 
 export async function getKarma(): Promise<KarmaInfo> {
   return authFetch<KarmaInfo>("/me/karma");
+}
+
+export async function getMatchStats(): Promise<MatchStats> {
+  return authFetch<MatchStats>("/me/profile/match-stats");
+}
+
+/** Headers + credentials para requests autenticados desde el cliente. */
+export function authenticatedFetchInit(): RequestInit {
+  return {
+    credentials: "include",
+    headers: authHeaders(),
+  };
 }
 
 export async function recordSearchActivity(): Promise<void> {

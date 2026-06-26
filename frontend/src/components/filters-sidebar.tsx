@@ -21,6 +21,7 @@ interface FiltersSidebarProps {
   filters: FilterState;
   onChange: (filters: FilterState) => void;
   sources: { slug: string; name: string }[];
+  cvMatchingAvailable?: boolean;
   className?: string;
 }
 
@@ -28,6 +29,7 @@ export function FiltersSidebar({
   filters,
   onChange,
   sources,
+  cvMatchingAvailable = false,
   className,
 }: FiltersSidebarProps) {
   function update<K extends keyof FilterState>(key: K, value: FilterState[K]) {
@@ -194,7 +196,9 @@ export function FiltersSidebar({
             onChange={(e) => update("sort", e.target.value as FilterState["sort"])}
             className="w-full rounded-xl bg-surface-2 px-3 py-2 text-sm outline-none"
           >
-            <option value="relevance">Relevancia IA</option>
+            <option value="relevance">
+              {cvMatchingAvailable ? "Relevancia IA (tu CV)" : "Relevancia IA"}
+            </option>
             <option value="published_at">Más recientes</option>
             <option value="salary">Mayor salario</option>
           </select>

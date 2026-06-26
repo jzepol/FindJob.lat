@@ -52,6 +52,7 @@ export interface OfferSummary {
   updated_at: string;
   duplicate_count: number;
   company_warning?: CompanyWarning | null;
+  match_score?: number | null;
 }
 
 export interface OfferDetail extends OfferSummary {
@@ -69,6 +70,14 @@ export interface PaginatedOffers {
   page: number;
   page_size: number;
   pages: number;
+  matching_mode?: "cv" | null;
+}
+
+export interface MatchStats {
+  embedding_ready: boolean;
+  match_score: number | null;
+  strong_matches: number;
+  offers_analyzed: number;
 }
 
 export interface Stats {

@@ -58,6 +58,10 @@ class OfferSummary(BaseModel):
     updated_at: datetime
     duplicate_count: int = 1
     company_warning: CompanyWarningOut | None = None
+    match_score: float | None = Field(
+        None,
+        description="Compatibilidad CV↔oferta (0–100) cuando hay matching semántico",
+    )
 
 
 class OfferDetail(OfferSummary):
@@ -75,6 +79,20 @@ class PaginatedOffers(BaseModel):
     page: int
     page_size: int
     pages: int
+    matching_mode: str | None = Field(
+        None,
+        description="cv = ordenado por similitud con el CV del usuario",
+    )
+
+
+class MatchStatsOut(BaseModel):
+    embedding_ready: bool = False
+    match_score: float | None = Field(
+        None,
+        description="Promedio de compatibilidad con las 5 mejores ofertas",
+    )
+    strong_matches: int = Field(0, description="Ofertas con compatibilidad ≥ 70%")
+    offers_analyzed: int = 0
 
 
 class StatsOut(BaseModel):

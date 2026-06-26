@@ -5,16 +5,19 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, UploadFile
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_session
-from app.api.schemas import CvUploadOut, KarmaOut, ProfileOut, ProfileUpdateIn, UserOut
-from app.models.base import KarmaEventType
+from app.api.schemas import CvUploadOut, KarmaOut, MatchStatsOut, ProfileOut, ProfileUpdateIn, UserOut
+from app.models.base import KarmaEventType, OfferStatus
+from app.models.offer import Offer
 from app.models.profile import Profile
 from app.models.user import User
 from app.services.cv_intelligence import process_cv_upload
 from app.services.embeddings import EmbeddingError, embed_cv_text
 from app.services.karma import award_karma, karma_progress, sync_profile_karma
+from app.services.offer_matching import distance_to_match_score
 
 router = APIRouter(prefix="/me", tags=["users"])
 
@@ -87,6 +90,57 @@ async def upload_cv(
         skills_extracted=parsed.skills,
         headline_extracted=parsed.headline,
         full_name_extracted=parsed.full_name,
+    )
+
+
+@router.get("/profile/match-stats", response_model=MatchStatsOut)
+async def get_match_stats(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> MatchStatsOut:
+    """Estadísticas de compatibilidad CV↔ofertas para el perfil."""
+    profile = user.profile
+    if profile is None or profile.cv_embedding is None:
+        return MatchStatsOut(embedding_ready=False)
+
+    cv_emb = list(profile.cv_embedding)
+    distance = Offer.embedding.cosine_distance(cv_emb).label("match_distance")
+
+    top_result = await session.execute(
+        select(distance)
+        .select_from(Offer)
+        .where(Offer.status == OfferStatus.ACTIVE, Offer.embedding.isnot(None))
+        .order_by(distance)
+        .limit(5)
+    )
+    top_distances = [row[0] for row in top_result.all()]
+    top_scores = [distance_to_match_score(d) for d in top_distances if d is not None]
+
+    count_result = await session.execute(
+        select(func.count())
+        .select_from(Offer)
+        .where(Offer.status == OfferStatus.ACTIVE, Offer.embedding.isnot(None))
+    )
+    offers_analyzed = count_result.scalar_one()
+
+    strong_result = await session.execute(
+        select(func.count())
+        .select_from(Offer)
+        .where(
+            Offer.status == OfferStatus.ACTIVE,
+            Offer.embedding.isnot(None),
+            Offer.embedding.cosine_distance(cv_emb) <= 0.3,
+        )
+    )
+    strong_matches = strong_result.scalar_one()
+
+    avg_score = round(sum(top_scores) / len(top_scores), 1) if top_scores else None
+
+    return MatchStatsOut(
+        embedding_ready=True,
+        match_score=avg_score,
+        strong_matches=strong_matches,
+        offers_analyzed=offers_analyzed,
     )
 
 
