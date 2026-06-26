@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CookieManageLink } from "./cookie-manage-link";
 import { Logo } from "./logo";
 
 export function Footer() {
@@ -11,7 +12,7 @@ export function Footer() {
             Agregador de empleos con IA para Latinoamérica
           </p>
         </div>
-        <div className="flex gap-6 text-sm text-muted">
+        <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-muted sm:justify-end">
           <Link href="/jobs" className="hover:text-primary">
             Ofertas
           </Link>
@@ -24,6 +25,13 @@ export function Footer() {
           <Link href="/perfil" className="hover:text-primary">
             Perfil
           </Link>
+          <Link href="/legal/privacidad" className="hover:text-primary">
+            Privacidad
+          </Link>
+          <Link href="/legal/cookies" className="hover:text-primary">
+            Cookies
+          </Link>
+          <CookieManageLink />
         </div>
         <p className="text-xs text-muted">© {new Date().getFullYear()} Findjob.lat</p>
       </div>
