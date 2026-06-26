@@ -18,6 +18,7 @@ import { KarmaPanel } from "@/components/karma-panel";
 import { ProfileAvatar } from "@/components/profile-avatar";
 import { ProfileStepper } from "@/components/profile-stepper";
 import { SUGGESTED_SKILLS } from "@/lib/constants";
+import { CookiePreferencesPanel } from "@/components/cookie-preferences-panel";
 import { CvUpload } from "@/components/cv-upload";
 import { getKarma, getMatchStats, updateProfile, type KarmaInfo } from "@/lib/auth";
 import type { MatchStats } from "@/lib/types";
@@ -466,6 +467,10 @@ export default function PerfilPage() {
                   </button>
                 )}
               </div>
+            </div>
+
+            <div className="card-premium rounded-2xl p-6 sm:p-8">
+              <CookiePreferencesPanel showWithdraw />
             </div>
           </div>
         </div>

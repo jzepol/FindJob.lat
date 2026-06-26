@@ -1,20 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, Bookmark, Building2, Clock, Layers, MapPin, Sparkles } from "lucide-react";
+import { ArrowUpRight, Bookmark, Building2, Clock, Layers, MapPin } from "lucide-react";
 import type { OfferSummary } from "@/lib/types";
 import { cn, formatSalary, timeAgo } from "@/lib/utils";
 import { CompanyAvatar } from "./company-avatar";
+import { MatchScoreCorner } from "./match-score-corner";
 import { ModalityBadge } from "./modality-badge";
 import { SeniorityBadge } from "./seniority-badge";
 import { SourceBadge } from "./source-badge";
 import { useToast } from "./toast-provider";
-
-function matchScoreColor(score: number): string {
-  if (score >= 75) return "border-emerald-500/30 bg-emerald-500/10 text-emerald-400";
-  if (score >= 55) return "border-primary/30 bg-primary/10 text-primary";
-  return "border-border bg-surface-2 text-muted";
-}
 
 export function OfferCard({
   offer,
@@ -37,7 +32,16 @@ export function OfferCard({
     >
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
 
-      <div className="flex flex-col gap-5 p-5 sm:p-6">
+      {showMatchScore && offer.match_score != null && (
+        <MatchScoreCorner score={offer.match_score} />
+      )}
+
+      <div
+        className={cn(
+          "flex flex-col gap-5 p-5 sm:p-6",
+          showMatchScore && offer.match_score != null && "pr-24 sm:pr-28",
+        )}
+      >
         <div className="flex items-start gap-4">
           <CompanyAvatar company={offer.company} size="lg" />
 
@@ -75,17 +79,6 @@ export function OfferCard({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {showMatchScore && offer.match_score != null && (
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold",
-                matchScoreColor(offer.match_score),
-              )}
-            >
-              <Sparkles className="h-3 w-3" />
-              {offer.match_score}% match
-            </span>
-          )}
           <ModalityBadge modality={offer.modality} />
           <SeniorityBadge seniority={offer.seniority} />
           {offer.duplicate_count > 1 && (

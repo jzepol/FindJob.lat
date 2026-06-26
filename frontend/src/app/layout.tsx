@@ -4,6 +4,7 @@ import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
 import { AuthProvider } from "@/components/auth-provider";
 import { ThemeProvider } from "@/components/theme-provider";
+import { CookieProvider } from "@/components/cookie-provider";
 import { ToastProvider } from "@/components/toast-provider";
 import "./globals.css";
 
@@ -42,13 +43,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className={`${inter.variable} ${sora.variable} ${jetbrains.variable}`}>
         <ThemeProvider>
-          <AuthProvider>
-            <ToastProvider>
-              <Navbar />
-              <main className="min-h-screen pt-16">{children}</main>
-              <Footer />
-            </ToastProvider>
-          </AuthProvider>
+          <CookieProvider>
+            <AuthProvider>
+              <ToastProvider>
+                <Navbar />
+                <main className="min-h-screen pt-16">{children}</main>
+                <Footer />
+              </ToastProvider>
+            </AuthProvider>
+          </CookieProvider>
         </ThemeProvider>
       </body>
     </html>
