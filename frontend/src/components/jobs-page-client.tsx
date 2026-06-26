@@ -1,8 +1,11 @@
 "use client";
 
+import { Sparkles } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { recordSearchActivity } from "@/lib/auth";
+import { useAuth } from "@/components/auth-provider";
+import { authenticatedFetchInit, recordSearchActivity } from "@/lib/auth";
 import type { Modality, OfferSummary, PaginatedOffers, Seniority } from "@/lib/types";
 import { EmptyState } from "./empty-state";
 import { FiltersSidebar, type FilterState } from "./filters-sidebar";
@@ -11,9 +14,10 @@ import { OfferCardSkeleton } from "./offer-card-skeleton";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
-function parseFilters(params: URLSearchParams): FilterState {
+function parseFilters(params: URLSearchParams, hasCv: boolean): FilterState {
   const modality = params.getAll("modality") as Modality[];
   const seniority = params.getAll("seniority") as Seniority[];
+  const sortParam = params.get("sort") as FilterState["sort"] | null;
   return {
     q: params.get("q") ?? "",
     location: params.get("location") ?? "",
@@ -27,7 +31,7 @@ function parseFilters(params: URLSearchParams): FilterState {
         : [],
     salary_min: Number(params.get("salary_min") ?? 0),
     published_within: (params.get("published_within") as FilterState["published_within"]) ?? "",
-    sort: (params.get("sort") as FilterState["sort"]) ?? "published_at",
+    sort: sortParam ?? (hasCv ? "relevance" : "published_at"),
   };
 }
 
@@ -48,7 +52,12 @@ function buildQuery(filters: FilterState, page: number): string {
 
 export function JobsPageClient({ sources }: { sources: { slug: string; name: string }[] }) {
   const searchParams = useSearchParams();
-  const [filters, setFilters] = useState<FilterState>(() => parseFilters(searchParams));
+  const { user } = useAuth();
+  const hasCv = Boolean(user?.profile?.cv_text && user.profile.cv_text.length > 50);
+
+  const [filters, setFilters] = useState<FilterState>(() =>
+    parseFilters(searchParams, hasCv),
+  );
   const [data, setData] = useState<PaginatedOffers | null>(null);
   const [items, setItems] = useState<OfferSummary[]>([]);
   const [page, setPage] = useState(1);
@@ -60,7 +69,7 @@ export function JobsPageClient({ sources }: { sources: { slug: string; name: str
       if (append) setLoadingMore(true);
       else setLoading(true);
       try {
-        const res = await fetch(`${API_BASE}/offers?${buildQuery(f, p)}`);
+        const res = await fetch(`${API_BASE}/offers?${buildQuery(f, p)}`, authenticatedFetchInit());
         const json: PaginatedOffers = await res.json();
         setData(json);
         setItems((prev) => (append ? [...prev, ...json.items] : json.items));
@@ -76,8 +85,8 @@ export function JobsPageClient({ sources }: { sources: { slug: string; name: str
   );
 
   useEffect(() => {
-    setFilters(parseFilters(searchParams));
-  }, [searchParams]);
+    setFilters(parseFilters(searchParams, hasCv));
+  }, [searchParams, hasCv]);
 
   useEffect(() => {
     const params = buildQuery(filters, 1);
@@ -91,6 +100,8 @@ export function JobsPageClient({ sources }: { sources: { slug: string; name: str
     return () => clearTimeout(t);
   }, [filters, fetchOffers]);
 
+  const cvMatchingActive = data?.matching_mode === "cv" && filters.sort === "relevance";
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-8">
@@ -100,11 +111,33 @@ export function JobsPageClient({ sources }: { sources: { slug: string; name: str
         </p>
       </div>
 
+      {cvMatchingActive && (
+        <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3 text-sm">
+          <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+          <span className="text-foreground-secondary">
+            Ordenando por compatibilidad con tu CV usando IA semántica.
+          </span>
+          <Link href="/perfil" className="text-primary hover:underline">
+            Ver perfil
+          </Link>
+        </div>
+      )}
+
+      {!hasCv && filters.sort === "relevance" && (
+        <div className="mb-6 rounded-2xl border border-border bg-surface-2/60 px-4 py-3 text-sm text-muted">
+          <Link href="/auth/login" className="text-primary hover:underline">
+            Iniciá sesión
+          </Link>{" "}
+          y subí tu CV para activar el orden por relevancia IA.
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
         <FiltersSidebar
           filters={filters}
           onChange={setFilters}
           sources={sources}
+          cvMatchingAvailable={hasCv}
           className="lg:sticky lg:top-24 lg:self-start"
         />
 
@@ -116,7 +149,7 @@ export function JobsPageClient({ sources }: { sources: { slug: string; name: str
           ) : (
             <>
               {items.map((offer) => (
-                <OfferCard key={offer.id} offer={offer} />
+                <OfferCard key={offer.id} offer={offer} showMatchScore={cvMatchingActive} />
               ))}
               {data && page < data.pages && (
                 <button

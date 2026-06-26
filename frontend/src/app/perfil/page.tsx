@@ -19,7 +19,8 @@ import { ProfileAvatar } from "@/components/profile-avatar";
 import { ProfileStepper } from "@/components/profile-stepper";
 import { SUGGESTED_SKILLS } from "@/lib/constants";
 import { CvUpload } from "@/components/cv-upload";
-import { getKarma, updateProfile, type KarmaInfo } from "@/lib/auth";
+import { getKarma, getMatchStats, updateProfile, type KarmaInfo } from "@/lib/auth";
+import type { MatchStats } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/toast-provider";
 
@@ -59,6 +60,7 @@ export default function PerfilPage() {
   const [skills, setSkills] = useState<string[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
   const [karma, setKarma] = useState<KarmaInfo | null>(null);
+  const [matchStats, setMatchStats] = useState<MatchStats | null>(null);
   const [saving, setSaving] = useState(false);
 
   const oauthAvatar = user?.oauth_accounts[0]?.avatar_url ?? null;
@@ -73,13 +75,17 @@ export default function PerfilPage() {
     }
     if (user) {
       getKarma().then(setKarma).catch(() => {});
+      getMatchStats().then(setMatchStats).catch(() => {});
     }
   }, [user]);
 
-  const matchScore = Math.min(
+  const estimatedScore = Math.min(
     94,
     40 + skills.length * 4 + (cvText.length > 100 ? 25 : 0) + (headline ? 10 : 0),
   );
+  const matchScore = matchStats?.embedding_ready
+    ? (matchStats.match_score ?? estimatedScore)
+    : estimatedScore;
 
   const completedSteps = [name.trim().length > 0, cvText.length > 50, skills.length > 0].filter(
     Boolean,
@@ -368,13 +374,25 @@ export default function PerfilPage() {
                   <div className="overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-surface to-secondary/10 p-6 text-center sm:p-8">
                     <Sparkles className="mx-auto mb-3 h-7 w-7 text-primary" />
                     <p className="text-sm font-medium text-foreground-secondary">
-                      Score de matching estimado
+                      {matchStats?.embedding_ready
+                        ? "Compatibilidad con ofertas"
+                        : "Score de matching estimado"}
                     </p>
                     <p className="mt-1 font-mono text-5xl font-bold tracking-tight text-primary sm:text-6xl">
                       {matchScore}%
                     </p>
                     <p className="mx-auto mt-3 max-w-xs text-xs leading-relaxed text-muted">
-                      Basado en tu CV, headline y preferencias. Se actualiza al guardar el perfil.
+                      {matchStats?.embedding_ready ? (
+                        <>
+                          Promedio de tus 5 mejores matches entre{" "}
+                          {matchStats.offers_analyzed.toLocaleString("es-AR")} ofertas.
+                          {matchStats.strong_matches > 0 && (
+                            <> {matchStats.strong_matches} con ≥70% compatibilidad.</>
+                          )}
+                        </>
+                      ) : (
+                        "Subí tu CV para calcular compatibilidad real con IA."
+                      )}
                     </p>
                   </div>
                 </div>
@@ -416,8 +434,9 @@ export default function PerfilPage() {
                           preferred_locations: locations,
                         });
                         await refresh();
-                        const k = await getKarma();
+                        const [k, ms] = await Promise.all([getKarma(), getMatchStats()]);
                         setKarma(k);
+                        setMatchStats(ms);
                         toast("Tu perfil quedó actualizado y listo para matching con IA.", {
                           variant: "success",
                           title: "¡Perfil guardado!",

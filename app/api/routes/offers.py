@@ -4,21 +4,27 @@ from __future__ import annotations
 
 import math
 import uuid
-from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import get_session
+from app.api.deps import get_current_user, get_current_user_optional, get_session
 from app.api.schemas import CompanyWarningOut, OfferDetail, OfferSummary, PaginatedOffers, SourceOut
-from app.services.company_reports import get_company_warning
-from app.services.location_filter import location_like_patterns
 from app.models.base import Modality, OfferStatus, Seniority
 from app.models.offer import Offer
 from app.models.source import Source
+from app.models.user import User
+from app.services.company_reports import get_company_warning
+from app.services.offer_matching import (
+    apply_offer_filters,
+    apply_sort,
+    base_offers_query,
+    cv_embedding_from_user,
+    distance_to_match_score,
+)
 
 router = APIRouter(prefix="/offers", tags=["offers"])
 
@@ -28,6 +34,7 @@ def _offer_to_summary(
     *,
     duplicate_count: int = 1,
     company_warning: CompanyWarningOut | None = None,
+    match_score: float | None = None,
 ) -> OfferSummary:
     return OfferSummary(
         id=offer.id,
@@ -48,12 +55,101 @@ def _offer_to_summary(
         updated_at=offer.updated_at,
         duplicate_count=duplicate_count,
         company_warning=company_warning,
+        match_score=match_score,
+    )
+
+
+async def _duplicate_counts(
+    session: AsyncSession,
+    offers: list[Offer],
+) -> dict[str, int]:
+    fingerprints = [o.fingerprint for o in offers]
+    if not fingerprints:
+        return {}
+    dup_result = await session.execute(
+        select(Offer.fingerprint, func.count())
+        .where(Offer.fingerprint.in_(fingerprints), Offer.status == OfferStatus.ACTIVE)
+        .group_by(Offer.fingerprint)
+    )
+    return dict(dup_result.all())
+
+
+async def _paginate_offers(
+    session: AsyncSession,
+    *,
+    q: str | None,
+    location: str | None,
+    modality: list[Modality] | None,
+    seniority: list[Seniority] | None,
+    slug_filter: list[str] | None,
+    salary_min: float | None,
+    published_within: str | None,
+    sort: str,
+    page: int,
+    page_size: int,
+    user: User | None = None,
+    apply_profile_prefs: bool = False,
+) -> PaginatedOffers:
+    query = base_offers_query()
+    profile = user.profile if user else None
+
+    query = apply_offer_filters(
+        query,
+        q=q,
+        location=location,
+        modality=modality,
+        seniority=seniority,
+        slug_filter=slug_filter,
+        salary_min=salary_min,
+        published_within=published_within,
+        profile=profile,
+        apply_profile_prefs=apply_profile_prefs,
+    )
+
+    count_result = await session.execute(select(func.count()).select_from(query.subquery()))
+    total = count_result.scalar_one()
+
+    cv_emb = cv_embedding_from_user(user)
+    query, cv_matching = apply_sort(query, sort=sort, cv_embedding=cv_emb)
+
+    offset = (page - 1) * page_size
+    result = await session.execute(query.offset(offset).limit(page_size))
+
+    offers: list[Offer] = []
+    scores: list[float | None] = []
+    if cv_matching:
+        for row in result.all():
+            offers.append(row[0])
+            scores.append(distance_to_match_score(row[1]))
+    else:
+        offers = list(result.scalars().all())
+        scores = [None] * len(offers)
+
+    dup_map = await _duplicate_counts(session, offers)
+    items = [
+        _offer_to_summary(
+            o,
+            duplicate_count=dup_map.get(o.fingerprint, 1),
+            match_score=score,
+        )
+        for o, score in zip(offers, scores, strict=True)
+    ]
+    pages = max(1, math.ceil(total / page_size)) if total else 1
+
+    return PaginatedOffers(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        pages=pages,
+        matching_mode="cv" if cv_matching else None,
     )
 
 
 @router.get("", response_model=PaginatedOffers)
 async def list_offers(
     session: Annotated[AsyncSession, Depends(get_session)],
+    user: Annotated[User | None, Depends(get_current_user_optional)],
     q: str | None = None,
     location: str | None = None,
     modality: list[Modality] | None = Query(None),
@@ -66,85 +162,51 @@ async def list_offers(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ) -> PaginatedOffers:
-    query = (
-        select(Offer)
-        .join(Source)
-        .where(Offer.status == OfferStatus.ACTIVE)
-        .options(selectinload(Offer.source))
-    )
-
-    if q:
-        pattern = f"%{q.lower()}%"
-        query = query.where(
-            or_(
-                func.lower(Offer.title).like(pattern),
-                func.lower(Offer.company).like(pattern),
-                func.lower(Offer.normalized_title).like(pattern),
-                func.lower(Offer.normalized_company).like(pattern),
-                func.lower(Offer.description).like(pattern),
-            )
-        )
-
-    if location:
-        patterns = location_like_patterns(location)
-        if patterns:
-            query = query.where(
-                or_(*[func.lower(Offer.location).like(p) for p in patterns])
-            )
-
-    if modality:
-        query = query.where(Offer.modality.in_(modality))
-
-    if seniority:
-        query = query.where(Offer.seniority.in_(seniority))
-
     slug_filter = sources or ([source] if source else None)
-    if slug_filter:
-        query = query.where(Source.slug.in_(slug_filter))
-
-    if salary_min is not None:
-        query = query.where(Offer.salary_min >= salary_min)
-
-    if published_within:
-        now = datetime.now(UTC)
-        deltas = {"today": 1, "week": 7, "month": 30}
-        since = now - timedelta(days=deltas[published_within])
-        query = query.where(Offer.published_at >= since)
-
-    if sort == "salary":
-        query = query.order_by(Offer.salary_max.desc().nullslast(), Offer.published_at.desc())
-    elif sort == "relevance" and q:
-        query = query.order_by(Offer.published_at.desc())
-    else:
-        query = query.order_by(Offer.published_at.desc().nullslast(), Offer.created_at.desc())
-
-    count_result = await session.execute(select(func.count()).select_from(query.subquery()))
-    total = count_result.scalar_one()
-
-    offset = (page - 1) * page_size
-    result = await session.execute(query.offset(offset).limit(page_size))
-    offers = result.scalars().all()
-
-    # Contar duplicados por fingerprint
-    fingerprints = [o.fingerprint for o in offers]
-    dup_map: dict[str, int] = {}
-    if fingerprints:
-        dup_result = await session.execute(
-            select(Offer.fingerprint, func.count())
-            .where(Offer.fingerprint.in_(fingerprints), Offer.status == OfferStatus.ACTIVE)
-            .group_by(Offer.fingerprint)
-        )
-        dup_map = dict(dup_result.all())
-
-    items = [_offer_to_summary(o, duplicate_count=dup_map.get(o.fingerprint, 1)) for o in offers]
-    pages = max(1, math.ceil(total / page_size)) if total else 1
-
-    return PaginatedOffers(
-        items=items,
-        total=total,
+    return await _paginate_offers(
+        session,
+        q=q,
+        location=location,
+        modality=modality,
+        seniority=seniority,
+        slug_filter=slug_filter,
+        salary_min=salary_min,
+        published_within=published_within,
+        sort=sort,
         page=page,
         page_size=page_size,
-        pages=pages,
+        user=user,
+    )
+
+
+@router.get("/for-me", response_model=PaginatedOffers)
+async def offers_for_me(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    user: Annotated[User, Depends(get_current_user)],
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+) -> PaginatedOffers:
+    """Ofertas recomendadas según CV y preferencias del perfil."""
+    if cv_embedding_from_user(user) is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Subí tu CV en el perfil para activar recomendaciones personalizadas.",
+        )
+
+    return await _paginate_offers(
+        session,
+        q=None,
+        location=None,
+        modality=None,
+        seniority=None,
+        slug_filter=None,
+        salary_min=None,
+        published_within=None,
+        sort="relevance",
+        page=page,
+        page_size=page_size,
+        user=user,
+        apply_profile_prefs=True,
     )
 
 
@@ -168,6 +230,7 @@ async def featured_offers(
 async def get_offer(
     offer_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_session)],
+    user: Annotated[User | None, Depends(get_current_user_optional)],
 ) -> OfferDetail:
     result = await session.execute(
         select(Offer)
@@ -191,21 +254,13 @@ async def get_offer(
     )
     duplicates = [_offer_to_summary(o) for o in dup_result.scalars().all()]
 
-    similar: list[OfferSummary] = []
-    if offer.embedding is not None:
-        similar_result = await session.execute(
-            select(Offer)
-            .join(Source)
-            .where(
-                Offer.id != offer.id,
-                Offer.status == OfferStatus.ACTIVE,
-                Offer.embedding.isnot(None),
-            )
-            .options(selectinload(Offer.source))
-            .order_by(Offer.embedding.cosine_distance(offer.embedding))
-            .limit(4)
+    cv_emb = cv_embedding_from_user(user)
+    match_score: float | None = None
+    if cv_emb is not None and offer.embedding is not None:
+        dist_result = await session.execute(
+            select(Offer.embedding.cosine_distance(cv_emb)).where(Offer.id == offer_id)
         )
-        similar = [_offer_to_summary(o) for o in similar_result.scalars().all()]
+        match_score = distance_to_match_score(dist_result.scalar_one())
 
     warning_data = await get_company_warning(
         session,
@@ -218,6 +273,7 @@ async def get_offer(
         offer,
         duplicate_count=1 + len(duplicates),
         company_warning=warning,
+        match_score=match_score,
     )
     detail = OfferDetail(
         **summary.model_dump(),
