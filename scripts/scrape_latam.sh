@@ -111,11 +111,10 @@ declare -A CT_LOCATIONS=(
 if [[ "${PLAYWRIGHT_OK}" -eq 1 ]]; then
   for country in ar co mx pe cl; do
     location="${CT_LOCATIONS[$country]}"
-    export COMPUTRABAJO_COUNTRY="${country}"
     for kw in "${KEYWORDS[@]}"; do
       run_scrape "computrabajo:${country}:${kw}" \
         python scripts/scrape.py \
-          --source computrabajo \
+          --source "computrabajo-${country}" \
           --keywords "${kw}" \
           --location "${location}" \
           --max-results "${MAX_PER_RUN}" \
