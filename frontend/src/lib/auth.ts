@@ -1,4 +1,4 @@
-import type { MatchStats } from "@/lib/types";
+import type { MatchStats, PaginatedOffers } from "@/lib/types";
 
 const DEV_TOKEN_KEY = "findjob_token";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
@@ -161,6 +161,23 @@ export async function getKarma(): Promise<KarmaInfo> {
 
 export async function getMatchStats(): Promise<MatchStats> {
   return authFetch<MatchStats>("/me/profile/match-stats");
+}
+
+export async function getOffersForMe(page = 1, pageSize = 20): Promise<PaginatedOffers> {
+  const res = await fetch(
+    `${API_BASE}/offers/for-me?page=${page}&page_size=${pageSize}`,
+    authenticatedFetchInit(),
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const detail = err.detail;
+    const message =
+      typeof detail === "string"
+        ? detail
+        : "No pudimos cargar tus recomendaciones. Subí tu CV en el perfil.";
+    throw new Error(message);
+  }
+  return res.json() as Promise<PaginatedOffers>;
 }
 
 /** Headers + credentials para requests autenticados desde el cliente. */

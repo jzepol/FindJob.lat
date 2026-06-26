@@ -15,6 +15,9 @@ export function Footer() {
           <Link href="/jobs" className="hover:text-primary">
             Ofertas
           </Link>
+          <Link href="/jobs/for-me" className="hover:text-primary">
+            Para vos
+          </Link>
           <Link href="/salarios" className="hover:text-primary">
             Salarios
           </Link>
