@@ -65,13 +65,18 @@ def matches_keywords(text: str, keywords: str) -> bool:
 
 
 _BUMERAN_ID_RE = re.compile(r"-(\d+)\.html(?:\?.*)?$", re.IGNORECASE)
+_BUMERAN_NUMERIC_RE = re.compile(r"/empleos/(\d+)\.html(?:\?.*)?$", re.IGNORECASE)
 
 
 def extract_bumeran_external_id(url: str) -> str:
     """Extrae ID numérico final de URLs de Bumeran."""
-    match = _BUMERAN_ID_RE.search(url.split("?")[0])
+    path = url.split("?")[0]
+    match = _BUMERAN_ID_RE.search(path)
     if match:
         return match.group(1)
+    num = _BUMERAN_NUMERIC_RE.search(path)
+    if num:
+        return num.group(1)
     return extract_computrabajo_external_id(url)
 
 
